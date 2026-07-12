@@ -1,4 +1,4 @@
-import React, { Fragment, useMemo, useState } from "react";
+import React, { Fragment, useEffect, useMemo, useState } from "react";
 import {
   Container,
   Row,
@@ -15,7 +15,8 @@ import { Breadcrumbs, H4, H5, P } from "../../../AbstractElements";
 import DataTable from "react-data-table-component";
 import DatePicker from "react-datepicker";
 import Chart from "react-apexcharts";
-import { historialEventos, skusDisponibles } from "../../../Data/Vigilante";
+import { toast } from "react-toastify";
+import { getEventos, mensajeDeError } from "../../../api/vigilanteApi";
 
 const formatearFecha = (iso) =>
   new Date(iso).toLocaleString("es-PE", {
@@ -35,20 +36,41 @@ const Historial = () => {
   const [skuFiltro, setSkuFiltro] = useState("");
   const [desde, setDesde] = useState(null);
   const [hasta, setHasta] = useState(null);
+  const [eventos, setEventos] = useState([]);
+  const [cargando, setCargando] = useState(true);
 
-  const eventosFiltrados = useMemo(() => {
-    return historialEventos.eventos.filter((ev) => {
-      const coincideSku =
-        skuFiltro === "" ||
-        (ev.tipo === "discrepancia" && ev.sku === skuFiltro) ||
-        (ev.tipo === "auditoria" && ev.faltantes?.includes(skuFiltro));
-      const fecha = new Date(ev.timestamp);
-      const coincideDesde = !desde || fecha >= new Date(desde).setHours(0, 0, 0, 0);
-      const coincideHasta =
-        !hasta || fecha <= new Date(hasta).setHours(23, 59, 59, 999);
-      return coincideSku && coincideDesde && coincideHasta;
-    });
+  // Los filtros los aplica el BACKEND (query params de /eventos); acá solo se piden.
+  useEffect(() => {
+    const cargar = async () => {
+      setCargando(true);
+      try {
+        const inicioDia = desde ? new Date(new Date(desde).setHours(0, 0, 0, 0)) : null;
+        const finDia = hasta ? new Date(new Date(hasta).setHours(23, 59, 59, 999)) : null;
+        const data = await getEventos({
+          sku: skuFiltro || undefined,
+          desde: inicioDia ? inicioDia.toISOString() : undefined,
+          hasta: finDia ? finDia.toISOString() : undefined,
+        });
+        setEventos(data.eventos);
+      } catch (error) {
+        toast.error(mensajeDeError(error));
+      } finally {
+        setCargando(false);
+      }
+    };
+    cargar();
   }, [skuFiltro, desde, hasta]);
+
+  const eventosFiltrados = eventos;
+
+  // Opciones del filtro de producto: todas las etiquetas vistas en los eventos.
+  const skusDisponibles = useMemo(() => {
+    const nombres = eventos.flatMap((e) => [
+      ...(e.conteo?.productos_detectados || []).map((p) => p.nombre),
+      ...(e.faltantes || []),
+    ]);
+    return [...new Set(nombres.filter((n) => n && n !== "producto_no_ubicado"))];
+  }, [eventos]);
 
   const columns = [
     {
@@ -227,6 +249,8 @@ const Historial = () => {
                   paginationRowsPerPageOptions={[10, 20, 30]}
                   striped
                   highlightOnHover
+                  progressPending={cargando}
+                  progressComponent={<div className="py-4">Cargando eventos…</div>}
                   conditionalRowStyles={conditionalRowStyles}
                   noDataComponent="No hay eventos para los filtros elegidos"
                 />

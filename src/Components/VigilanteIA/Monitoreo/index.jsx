@@ -1,4 +1,4 @@
-import React, { Fragment, useEffect, useState } from "react";
+import React, { Fragment, useCallback, useEffect, useState } from "react";
 import {
   Container,
   Row,
@@ -11,10 +11,10 @@ import {
   Spinner,
 } from "reactstrap";
 import { Link } from "react-router-dom";
-import { Breadcrumbs, P } from "../../../AbstractElements";
+import { Breadcrumbs, H5, P } from "../../../AbstractElements";
 import { Camera, CameraOff, ExternalLink } from "react-feather";
 import { toast } from "react-toastify";
-import { monitoreo } from "../../../Data/Vigilante";
+import { capturarAhora, getMonitoreo, mensajeDeError } from "../../../api/vigilanteApi";
 
 const formatearHoraRelativa = (iso) => {
   if (!iso) return "sin fotos aún";
@@ -25,16 +25,22 @@ const formatearHoraRelativa = (iso) => {
   return `hace ${h} h ${diffMin % 60} min`;
 };
 
-const TileCamara = ({ camara }) => {
+const TileCamara = ({ camara, alCapturar }) => {
   const [capturando, setCapturando] = useState(false);
 
-  const capturarAhora = () => {
+  const capturar = async () => {
     setCapturando(true);
-    toast.info(`Captura solicitada a ${camara.nombre}`);
-    setTimeout(() => {
+    try {
+      await capturarAhora();
+      toast.info(`Captura solicitada a ${camara.nombre}`);
+      setTimeout(async () => {
+        await alCapturar();
+        setCapturando(false);
+      }, 10000);
+    } catch (error) {
+      toast.error(mensajeDeError(error));
       setCapturando(false);
-      toast.success(`Foto recibida de ${camara.nombre}`);
-    }, 3000);
+    }
   };
 
   return (
@@ -99,7 +105,7 @@ const TileCamara = ({ camara }) => {
           size="sm"
           className="flex-grow-1"
           disabled={capturando || !camara.en_linea}
-          onClick={capturarAhora}
+          onClick={capturar}
         >
           {capturando ? (
             <>
@@ -120,44 +126,76 @@ const TileCamara = ({ camara }) => {
 };
 
 const Monitoreo = () => {
-  const [, setTick] = useState(0);
+  const [data, setData] = useState(null); // MonitoreoResponse del backend
+  const [cargando, setCargando] = useState(true);
 
-  // Auto-refresh: en real re-consulta GET /monitoreo; en dummy actualiza el "hace X min".
-  useEffect(() => {
-    const timer = setInterval(() => setTick((t) => t + 1), 30000);
-    return () => clearInterval(timer);
+  const cargar = useCallback(async (silencioso = false) => {
+    try {
+      setData(await getMonitoreo());
+    } catch (error) {
+      if (!silencioso) toast.error(mensajeDeError(error));
+    } finally {
+      setCargando(false);
+    }
   }, []);
 
-  const enLinea = monitoreo.camaras.filter((c) => c.en_linea).length;
+  useEffect(() => {
+    cargar();
+    const timer = setInterval(() => cargar(true), 30000);
+    return () => clearInterval(timer);
+  }, [cargar]);
+
+  const camaras = data?.camaras || [];
+  const enLinea = camaras.filter((c) => c.en_linea).length;
 
   return (
     <Fragment>
       <Breadcrumbs mainTitle="Monitoreo" parent="VigilanteIA" title="Monitoreo" />
       <Container fluid={true}>
-        <Row className="g-3">
-          <Col xs="12" className="d-flex flex-wrap align-items-center justify-content-between gap-2">
-            <div className="d-flex align-items-center gap-2">
-              <Badge color="success" pill>
-                {enLinea} en línea
-              </Badge>
-              {monitoreo.camaras.length - enLinea > 0 && (
-                <Badge color="danger" pill>
-                  {monitoreo.camaras.length - enLinea} sin señal
+        {cargando ? (
+          <div className="text-center py-5">
+            <Spinner color="primary" />
+            <P attrPara={{ className: "text-muted mt-2" }}>Consultando tus cámaras…</P>
+          </div>
+        ) : camaras.length === 0 ? (
+          <Card className="text-center py-5">
+            <CardBody>
+              <CameraOff size={44} className="text-muted mb-3" />
+              <H5>Aún no tienes cámaras</H5>
+              <P attrPara={{ className: "text-muted mb-0" }}>
+                Cuando tu cámara envíe su primera foto, aparecerá aquí.
+              </P>
+            </CardBody>
+          </Card>
+        ) : (
+          <Row className="g-3">
+            <Col
+              xs="12"
+              className="d-flex flex-wrap align-items-center justify-content-between gap-2"
+            >
+              <div className="d-flex align-items-center gap-2">
+                <Badge color="success" pill>
+                  {enLinea} en línea
                 </Badge>
-              )}
-            </div>
-            <P attrPara={{ className: "text-muted small mb-0" }}>
-              Cada cámara envía una foto cada {monitoreo.frecuencia_minutos} min · usa
-              "Capturar ahora" para una foto fresca al instante
-            </P>
-          </Col>
-
-          {monitoreo.camaras.map((camara) => (
-            <Col xs="12" md="6" xl="4" key={camara.nodo_id}>
-              <TileCamara camara={camara} />
+                {camaras.length - enLinea > 0 && (
+                  <Badge color="danger" pill>
+                    {camaras.length - enLinea} sin señal
+                  </Badge>
+                )}
+              </div>
+              <P attrPara={{ className: "text-muted small mb-0" }}>
+                Cada cámara envía una foto cada {data.frecuencia_minutos} min · usa
+                "Capturar ahora" para una foto fresca al instante
+              </P>
             </Col>
-          ))}
-        </Row>
+
+            {camaras.map((camara) => (
+              <Col xs="12" md="6" xl="4" key={camara.nodo_id}>
+                <TileCamara camara={camara} alCapturar={() => cargar(true)} />
+              </Col>
+            ))}
+          </Row>
+        )}
       </Container>
     </Fragment>
   );

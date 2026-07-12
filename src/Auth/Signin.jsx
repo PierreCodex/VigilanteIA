@@ -1,37 +1,33 @@
-import React, { Fragment, useState, useEffect } from "react";
+import React, { Fragment, useState } from "react";
 import { Col, Form, FormGroup, Input, Label, Row } from "reactstrap";
 import { Btn, H4, P } from "../AbstractElements";
 
 import { toast } from "react-toastify";
 import man from "../assets/images/dashboard/1.png";
+import { iniciarSesion, mensajeDeError } from "../api/vigilanteApi";
 
 const Login = ({ selected }) => {
-  const [email, setEmail] = useState("test@gmail.com");
-  const [password, setPassword] = useState("test123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [togglePassword, setTogglePassword] = useState(false);
 
-  const [value, setValue] = useState(localStorage.getItem("profileURL" || man));
-  const [name, setName] = useState(localStorage.getItem("Name"));
-
-  useEffect(() => {
-    localStorage.setItem("profileURL", value);
-    localStorage.setItem("Name", name);
-  }, [value, name]);
-
   const loginAuth = async (e) => {
     e.preventDefault();
+    if (!email || !password) {
+      toast.error("Escribe tu correo y contraseña");
+      return;
+    }
     setLoading(true);
-    setValue(man);
-    setName("Emay Walter");
-    setEmail("test@gmail.com");
-    setPassword("test123");
-    if (email === "test@gmail.com" && password === "test123") {
-      localStorage.setItem("login", true);
-      window.location.href = `/dashboard/default`;
-      setLoading(false);
-    } else {
-      toast.error("Incorrect Password or Username!");
+    try {
+      const usuario = await iniciarSesion(email, password);
+      localStorage.setItem("profileURL", man);
+      localStorage.setItem("Name", usuario.nombre || usuario.email);
+      toast.success(`Bienvenido, ${usuario.nombre || usuario.email}`);
+      window.location.href = `/stand`;
+    } catch (error) {
+      toast.error(mensajeDeError(error));
+    } finally {
       setLoading(false);
     }
   };

@@ -466,6 +466,7 @@ export const MENUITEMS = [
         icon: Tool,
         type: "link",
         path: `/admin/herramientas`,
+        soloAdmin: true, // se oculta si el rol del JWT no es admin
       },
     ],
   },

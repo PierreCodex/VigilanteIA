@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { LI, UL, H6 } from '../../AbstractElements';
 import { MENUITEMS } from './Menu';
 import { Label } from 'reactstrap';
+import { esAdmin } from '../../api/vigilanteApi';
 
 const SidebarMenuItems = ({ setMainMenu, sidebartoogle, setNavActive }) => {
   const { t } = useTranslation();
@@ -49,7 +50,7 @@ const SidebarMenuItems = ({ setMainMenu, sidebartoogle, setNavActive }) => {
                 <H6>{t(Item.menutitle)}</H6>
               </div>
             </LI>
-            {Item.Items.map((menuItem, i) => (
+            {Item.Items.filter((mi) => !mi.soloAdmin || esAdmin()).map((menuItem, i) => (
               <LI attrLI={{ className: 'dropdown' }} key={i}>
                 {menuItem.type === 'sub' && (
                   <a href="javascript"

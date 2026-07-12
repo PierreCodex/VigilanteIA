@@ -15,7 +15,13 @@ import {
 import { Breadcrumbs, H4, H5, H6, P } from "../../../AbstractElements";
 import { Save, Trash2, Plus } from "react-feather";
 import { toast } from "react-toastify";
-import { slotsIniciales, skusDisponibles, estadoActual } from "../../../Data/Vigilante";
+import { Spinner } from "reactstrap";
+import {
+  getSlots,
+  getStandActual,
+  mensajeDeError,
+  putSlots,
+} from "../../../api/vigilanteApi";
 
 const normalizarRoi = (x, y, w, h, ancho, alto) => {
   const nx = Math.max(0, Math.min(1, x / ancho));
@@ -26,12 +32,36 @@ const normalizarRoi = (x, y, w, h, ancho, alto) => {
 };
 
 const Productos = () => {
-  const [slots, setSlots] = useState(slotsIniciales);
+  const [slots, setSlots] = useState([]);
   const [seleccionado, setSeleccionado] = useState(null);
   const [dibujo, setDibujo] = useState(null);
+  const [imagen, setImagen] = useState(null);
+  const [cargando, setCargando] = useState(true);
+  const [guardando, setGuardando] = useState(false);
   const contenedorRef = useRef(null);
 
-  const imagen = estadoActual.imagen_url;
+  useEffect(() => {
+    const cargar = async () => {
+      try {
+        const data = await getSlots();
+        setSlots(data.slots || []);
+      } catch (error) {
+        toast.error(mensajeDeError(error));
+      }
+      try {
+        // La foto de fondo del editor es la última captura del stand.
+        const stand = await getStandActual();
+        setImagen(stand.imagen_url);
+      } catch {
+        setImagen(null); // sin capturas aún: el editor avisa
+      }
+      setCargando(false);
+    };
+    cargar();
+  }, []);
+
+  // Sugerencias para el autocompletado: las etiquetas ya usadas en otros slots.
+  const skusDisponibles = [...new Set(slots.map((s) => s.sku).filter(Boolean))];
 
   const obtenerPunto = (e) => {
     const rect = contenedorRef.current.getBoundingClientRect();
@@ -46,6 +76,7 @@ const Productos = () => {
   };
 
   const empezarDibujo = (e) => {
+    if (!imagen) return; // sin foto del stand no hay dónde dibujar
     if (e.target.closest(".slot-existente")) return;
     const punto = obtenerPunto(e);
     setDibujo({ inicio: punto, fin: punto });
@@ -89,13 +120,24 @@ const Productos = () => {
     toast.info("Recuadro borrado");
   };
 
-  const guardar = () => {
+  const guardar = async () => {
     const sinSku = slots.filter((s) => !s.sku.trim());
     if (sinSku.length > 0) {
       toast.error("Todos los recuadros necesitan un nombre de producto");
       return;
     }
-    toast.success("Configuración guardada localmente");
+    setGuardando(true);
+    try {
+      // Renumerar 1..N: los ids temporales del dibujo (Date.now) no van al backend.
+      const numerados = slots.map((s, i) => ({ id: i + 1, sku: s.sku.trim(), roi: s.roi }));
+      const data = await putSlots(numerados);
+      setSlots(data.slots);
+      toast.success("Configuración guardada — el vigilante ya usa estos recuadros");
+    } catch (error) {
+      toast.error(mensajeDeError(error));
+    } finally {
+      setGuardando(false);
+    }
   };
 
   const slotActivo = slots.find((s) => s.id === seleccionado);
@@ -121,8 +163,16 @@ const Productos = () => {
           <Col xs="12">
             <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
               <H4 attrH4={{ className: "mb-0" }}>Configurar productos</H4>
-              <Button color="primary" onClick={guardar}>
-                <Save size={16} className="me-1" /> Guardar cambios
+              <Button color="primary" disabled={guardando || cargando} onClick={guardar}>
+                {guardando ? (
+                  <>
+                    <Spinner size="sm" className="me-1" /> Guardando…
+                  </>
+                ) : (
+                  <>
+                    <Save size={16} className="me-1" /> Guardar cambios
+                  </>
+                )}
               </Button>
             </div>
             <P attrPara={{ className: "text-muted small" }}>
@@ -145,13 +195,24 @@ const Productos = () => {
                   onTouchMove={moverDibujo}
                   onTouchEnd={terminarDibujo}
                 >
-                  <img
-                    src={imagen}
-                    alt="Stand para configurar"
-                    className="img-fluid w-100"
-                    style={{ maxHeight: "600px", objectFit: "contain" }}
-                    draggable={false}
-                  />
+                  {imagen ? (
+                    <img
+                      src={imagen}
+                      alt="Stand para configurar"
+                      className="img-fluid w-100"
+                      style={{ maxHeight: "600px", objectFit: "contain" }}
+                      draggable={false}
+                    />
+                  ) : (
+                    <div
+                      className="d-flex align-items-center justify-content-center text-muted text-center p-4"
+                      style={{ height: "320px" }}
+                    >
+                      {cargando
+                        ? "Cargando…"
+                        : "Aún no hay una foto del stand. Usa 'Capturar ahora' en Mi stand y vuelve aquí para dibujar los recuadros."}
+                    </div>
+                  )}
                   {slots.map((slot, idx) => (
                     <div
                       key={slot.id}
