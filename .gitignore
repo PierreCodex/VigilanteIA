@@ -1,0 +1,19 @@
+# Dependencias y build
+node_modules/
+dist/
+dist-ssr/
+
+# Entorno (VITE_API_URL y similares van en .env.local, nunca al repo)
+.env
+.env.local
+.env.*.local
+
+# Editor / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log*
+*.log
