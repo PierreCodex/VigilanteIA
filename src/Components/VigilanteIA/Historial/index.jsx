@@ -16,7 +16,7 @@ import DataTable from "react-data-table-component";
 import DatePicker from "react-datepicker";
 import Chart from "react-apexcharts";
 import { toast } from "react-toastify";
-import { getEventos, mensajeDeError } from "../../../api/vigilanteApi";
+import { getDiscrepancias, getEventos, mensajeDeError } from "../../../api/vigilanteApi";
 
 const formatearFecha = (iso) =>
   new Date(iso).toLocaleString("es-PE", {
@@ -30,6 +30,13 @@ const formatearFecha = (iso) =>
 const TIPO_COLORS = {
   auditoria: "info",
   discrepancia: "danger",
+};
+
+// La conciliación tiene 3 resultados con semáforo propio.
+const SUBTIPO_BADGE = {
+  venta_confirmada: { color: "success", texto: "Venta ✓" },
+  merma_sospechosa: { color: "danger", texto: "⚠ Merma" },
+  pendiente_conciliar: { color: "warning", texto: "Por conciliar" },
 };
 
 const Historial = () => {
@@ -46,12 +53,26 @@ const Historial = () => {
       try {
         const inicioDia = desde ? new Date(new Date(desde).setHours(0, 0, 0, 0)) : null;
         const finDia = hasta ? new Date(new Date(hasta).setHours(23, 59, 59, 999)) : null;
-        const data = await getEventos({
+        const filtros = {
           sku: skuFiltro || undefined,
           desde: inicioDia ? inicioDia.toISOString() : undefined,
           hasta: finDia ? finDia.toISOString() : undefined,
-        });
-        setEventos(data.eventos);
+        };
+        // Auditorías + discrepancias (conciliación venta-vs-merma) en una sola línea
+        // de tiempo — la tabla ya sabe pintar ambos tipos.
+        const [auditorias, conciliacion] = await Promise.all([
+          getEventos(filtros),
+          getDiscrepancias(filtros).catch(() => ({ discrepancias: [] })),
+        ]);
+        const discrepancias = conciliacion.discrepancias.map((d) => ({
+          ...d,
+          tipo: "discrepancia",
+          subtipo: d.tipo, // venta_confirmada | merma_sospechosa | pendiente_conciliar
+        }));
+        const todo = [...auditorias.eventos, ...discrepancias].sort(
+          (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
+        );
+        setEventos(todo);
       } catch (error) {
         toast.error(mensajeDeError(error));
       } finally {
@@ -81,12 +102,17 @@ const Historial = () => {
     },
     {
       name: "Tipo",
-      selector: (row) => row.tipo,
-      cell: (row) => (
-        <Badge color={TIPO_COLORS[row.tipo] || "secondary"}>
-          {row.tipo === "auditoria" ? "Auditoría" : "Discrepancia"}
-        </Badge>
-      ),
+      selector: (row) => row.subtipo || row.tipo,
+      cell: (row) => {
+        if (row.tipo === "auditoria") {
+          return <Badge color="info">Auditoría</Badge>;
+        }
+        const badge = SUBTIPO_BADGE[row.subtipo] || {
+          color: TIPO_COLORS.discrepancia,
+          texto: "Discrepancia",
+        };
+        return <Badge color={badge.color}>{badge.texto}</Badge>;
+      },
       sortable: true,
     },
     {
@@ -127,7 +153,8 @@ const Historial = () => {
 
   const conditionalRowStyles = [
     {
-      when: (row) => row.tipo === "discrepancia",
+      // Solo la MERMA se resalta en rojo; una venta confirmada no es alarma.
+      when: (row) => row.tipo === "discrepancia" && row.subtipo !== "venta_confirmada",
       style: {
         backgroundColor: "rgba(220, 53, 69, 0.08)",
         color: "#842029",

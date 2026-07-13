@@ -80,6 +80,24 @@ export const getEventos = async ({ sku, desde, hasta, pagina = 1, porPagina = 10
   return (await api.get("/eventos", { params })).data;
 };
 
+// --- Conciliación (Etapa D) ---
+
+export const getDiscrepancias = async ({ sku, desde, hasta } = {}) => {
+  const params = {};
+  if (sku) params.sku = sku;
+  if (desde) params.desde = desde;
+  if (hasta) params.hasta = hasta;
+  return (await api.get("/discrepancias", { params })).data;
+};
+
+export const getIntegracion = async () => (await api.get("/integracion")).data;
+
+export const putIntegracion = async (payload) =>
+  (await api.put("/integracion", payload)).data;
+
+export const probarIntegracion = async () =>
+  (await api.post("/integracion/probar")).data;
+
 // --- Administración (solo rol admin) ---
 
 export const getTenants = async () => (await api.get("/admin/tenants")).data;
