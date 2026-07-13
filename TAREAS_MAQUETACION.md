@@ -162,7 +162,47 @@ El dueño dibuja un rectángulo por producto sobre la foto y le pone nombre:
   textos en español, quitar botones de social login (`SocialAuth`).
 - **La lógica fake se queda tal cual** (test@gmail.com / test123).
 
+## ⭐ REGLA DE ORO: reutilizar componentes del template (NO crear estilos nuevos)
+
+El template Viho ya trae ~200 componentes en `src/Components/`. Para CADA pieza de UI
+que necesites (tabla, tarjeta, modal, formulario, lista, badge de estado, gráfico),
+**tú (el agente) DEBES primero buscar un componente parecido en el template, copiar su
+patrón de clases y adaptarlo** — en vez de escribir CSS propio o `style={{...}}` a mano.
+
+Cómo trabajar cada vista:
+1. Antes de escribir código, explora `src/Components/` y elige el/los componentes cuyo
+   patrón visual más se parezca a lo que necesitas.
+2. Copia sus clases (`media`, `widget-joins`, `b-l-*`, `bg-light-*`, `font-*`,
+   `table-bordernone`, `user-status`, etc.) y su estructura JSX.
+3. Solo cambia los DATOS (los del backend), no inventes estilos.
+4. Declara al inicio de tu entrega QUÉ componente del template reutilizaste para cada
+   vista (ej. "Tiendas reutiliza el patrón de `Dashboard/Default/RecentOrderCard`").
+
+Catálogo de referencia (mira estos primero según lo que necesites):
+- **Tablas** → `Tables/DataTable/` (react-data-table, con filtros/orden/paginación),
+  `Widgets/General/EmployeeStatusCard.jsx` (tabla simple con badges y progress),
+  `Dashboard/Default/RecentOrderCard.jsx`.
+- **Listas tipo tarjeta** (mejor que tabla en móvil) → patrón `media` de
+  `Dashboard/Ecommerce/TopSellingCard.jsx` (ya usado en la vista Mi stand).
+- **KPIs / contadores** → `Widgets/General/WidgetArrowCard.jsx` (patrón `widget-joins`
+  + `react-countup`), `Dashboard/Ecommerce/TotalSellingCard.jsx`.
+- **Formularios** → `Forms/FormLayout/Default/` y `FormWizard1/`.
+- **Modales** → `UiKits/Modals/` (Basic, Sizes, VaryingContent).
+- **Gráficos** → `Charts/ApexCharts/` y los `*Card.jsx` de `Dashboard/` que ya usan
+  ApexCharts.
+
+La vista **Mi stand** (`Components/VigilanteIA/Stand/index.jsx`) ya está hecha con este
+criterio — úsala como ejemplo de estilo a seguir (monitor NVR, tarjetas `media` con
+icono de estado + borde de color + progress, KPIs `widget-joins`). Las vistas nuevas
+deben verse coherentes con ella.
+
 ### T7 — Vista admin "Tiendas" (`/admin/tiendas`) — NUEVA (2026-07-12)
+
+**Reutiliza componentes** (ver Regla de Oro): la tabla de tiendas con el patrón de
+`Widgets/General/EmployeeStatusCard.jsx` o `Tables/DataTable/`; el modal "Nueva tienda"
+con `UiKits/Modals/`; el formulario dentro del modal con el patrón de
+`Forms/FormLayout/Default/`.
+
 Solo para el administrador del sistema (no el dueño). La API real YA existe
 (`GET/POST /api/panel/v1/admin/tenants`, requiere rol admin). Maquetar con dummy:
 
@@ -192,6 +232,12 @@ Solo para el administrador del sistema (no el dueño). La API real YA existe
 - Esta vista va en el menú DENTRO de la sección admin, junto a "Herramientas".
 
 ### T8 — Vista "Integración" (`/integracion`) — NUEVA (2026-07-12)
+
+**Reutiliza componentes** (ver Regla de Oro): el formulario con el patrón de
+`Forms/FormLayout/Default/` (Card + FormGroup + Label + Input de reactstrap); el
+resultado de "Probar conexión" con un `Alert` de `UiKits/Alert/` o el badge de estado
+del patrón que ya usa Mi stand. NADA de CSS nuevo.
+
 Conectar el sistema del cliente (POS) para la conciliación venta-vs-merma. La API
 real YA existe y el cliente axios también (`getIntegracion`, `putIntegracion`,
 `probarIntegracion` en `src/api/vigilanteApi.js`) — esta vista se conecta DIRECTO
