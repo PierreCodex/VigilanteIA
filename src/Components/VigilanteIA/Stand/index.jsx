@@ -5,15 +5,22 @@ import {
   Col,
   Card,
   CardBody,
-  CardHeader,
-  Alert,
   Badge,
   Button,
   Spinner,
   Progress,
 } from "reactstrap";
+import CountUp from "react-countup";
 import { Breadcrumbs, H5, H6, P } from "../../../AbstractElements";
-import { Camera, CameraOff, RefreshCw } from "react-feather";
+import {
+  AlertTriangle,
+  Camera,
+  CameraOff,
+  CheckCircle,
+  Package,
+  RefreshCw,
+  ShieldOff,
+} from "react-feather";
 import { toast } from "react-toastify";
 import { capturarAhora, getStandActual, mensajeDeError } from "../../../api/vigilanteApi";
 
@@ -21,8 +28,7 @@ const FRECUENCIA_CAPTURA_MIN = 5;
 const UMBRAL_SIN_SENAL_MIN = FRECUENCIA_CAPTURA_MIN * 2;
 
 const formatearHoraRelativa = (iso) => {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const diffMin = Math.max(0, Math.floor(diffMs / 60000));
+  const diffMin = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
   if (diffMin < 1) return "hace un momento";
   if (diffMin === 1) return "hace 1 min";
   if (diffMin < 60) return `hace ${diffMin} min`;
@@ -44,6 +50,20 @@ const observacionesLegibles = (obs) =>
     .replace(/^\[Híbrido:[^\]]*\]\s*/, "")
     .replace(/^YOLO por slots\s*—\s*/, "")
     .replace(/^YOLO local:\s*/, "");
+
+const BotonCapturar = ({ capturando, onClick, color = "primary" }) => (
+  <Button color={color} disabled={capturando} onClick={onClick}>
+    {capturando ? (
+      <>
+        <Spinner size="sm" className="me-1" /> Capturando…
+      </>
+    ) : (
+      <>
+        <Camera size={16} className="me-1" /> Capturar ahora
+      </>
+    )}
+  </Button>
+);
 
 const Stand = () => {
   const [estado, setEstado] = useState(null); // StandActualResponse del backend
@@ -83,7 +103,6 @@ const Stand = () => {
     try {
       await capturarAhora();
       toast.info("Captura solicitada — la cámara disparará en unos segundos");
-      // La foto tarda: el ESP32 sondea, captura y sube. Refrescamos en 10 s.
       setTimeout(async () => {
         await cargar(true);
         setCapturando(false);
@@ -112,9 +131,10 @@ const Stand = () => {
     });
   }, [conteo, faltantes]);
 
-  const hayDesorden = (conteo?.productos_detectados || []).some(
+  const desubicados = (conteo?.productos_detectados || []).find(
     (p) => p.nombre === "producto_no_ubicado"
   );
+  const todoEnOrden = faltantes.length === 0 && !desubicados;
 
   return (
     <Fragment>
@@ -133,198 +153,216 @@ const Stand = () => {
               <P attrPara={{ className: "text-muted" }}>
                 Cuando el vigilante capture la primera imagen, la verás aquí.
               </P>
-              <Button color="primary" disabled={capturando} onClick={solicitarCaptura}>
-                {capturando ? (
-                  <>
-                    <Spinner size="sm" className="me-1" /> Capturando…
-                  </>
-                ) : (
-                  <>
-                    <Camera size={16} className="me-1" /> Capturar ahora
-                  </>
-                )}
-              </Button>
+              <BotonCapturar capturando={capturando} onClick={solicitarCaptura} />
             </CardBody>
           </Card>
         ) : (
           <Row className="g-3">
-            <Col xs="12">
-              <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                <div className="d-flex align-items-center gap-2 flex-wrap">
-                  <Badge
-                    color={enLinea ? "success" : "danger"}
-                    pill
-                    className="d-flex align-items-center gap-1"
-                  >
-                    <span>{enLinea ? "🟢" : "🔴"}</span>
-                    <span>
-                      {enLinea
-                        ? `Cámara en línea — última foto ${formatearHoraRelativa(estado.timestamp)}`
-                        : `Sin señal desde las ${formatearHora(estado.timestamp)}`}
-                    </span>
-                  </Badge>
-                  {estado.verificado_por_ia && (
-                    <Badge color="info" pill>
-                      ✔ verificado por IA
-                    </Badge>
-                  )}
-                </div>
-                <Button color="primary" disabled={capturando} onClick={solicitarCaptura}>
-                  {capturando ? (
-                    <>
-                      <Spinner size="sm" className="me-1" /> Capturando…
-                    </>
-                  ) : (
-                    <>
-                      <Camera size={16} className="me-1" /> Capturar ahora
-                    </>
-                  )}
-                </Button>
-              </div>
-              <P attrPara={{ className: "text-muted small mb-0" }}>
-                Actualizado a las {formatearHora(estado.timestamp)} ·{" "}
-                <RefreshCw size={12} className="me-1" />
-                se refresca solo cada 30 s
-              </P>
-            </Col>
-
-            <Col xs="12" lg="7" xl="8">
-              <Card>
-                <CardBody className="p-2 p-md-3">
-                  <div className="position-relative rounded overflow-hidden bg-light">
+            {/* ============ EL MONITOR: la foto como cámara de seguridad ============ */}
+            <Col xs="12" lg="8">
+              <Card className="mb-0 h-100 overflow-hidden">
+                <div className="position-relative bg-dark h-100 d-flex flex-column">
+                  <div className="position-relative flex-grow-1 d-flex align-items-center justify-content-center">
                     {estado.imagen_url ? (
                       <img
                         src={estado.imagen_url}
                         alt="Última captura del stand"
                         className="img-fluid w-100"
-                        style={{ maxHeight: "520px", objectFit: "contain" }}
+                        style={{ maxHeight: "560px", objectFit: "contain" }}
                       />
                     ) : (
-                      <div
-                        className="d-flex align-items-center justify-content-center text-muted"
-                        style={{ height: "320px" }}
-                      >
-                        <span>La imagen de esta captura no está disponible</span>
+                      <div className="text-muted py-5">
+                        La imagen de esta captura no está disponible
                       </div>
                     )}
+
+                    {/* chip de señal, estilo NVR */}
+                    <div className="position-absolute d-flex align-items-center gap-2" style={{ top: 12, left: 12 }}>
+                      <Badge color={enLinea ? "success" : "danger"} className="d-flex align-items-center gap-1 px-2 py-1">
+                        <span
+                          className={`d-inline-block rounded-circle bg-white ${enLinea ? "" : "opacity-50"}`}
+                          style={{ width: 7, height: 7 }}
+                        />
+                        {enLinea ? "EN VIVO · vigilando" : "SIN SEÑAL"}
+                      </Badge>
+                      {estado.verificado_por_ia && (
+                        <Badge color="info" className="px-2 py-1">✔ verificado por IA</Badge>
+                      )}
+                    </div>
+
+                    {/* franja inferior con degradado, como los monitores de seguridad */}
                     <div
-                      className="position-absolute px-2 py-1 rounded"
-                      style={{ top: 8, right: 8, background: "rgba(0,0,0,0.6)" }}
+                      className="position-absolute bottom-0 start-0 end-0 px-3 py-2 d-flex justify-content-between align-items-end"
+                      style={{ background: "linear-gradient(transparent, rgba(0,0,0,0.75))" }}
                     >
                       <span className="text-white small">
-                        📷 {formatearHoraRelativa(estado.timestamp)}
+                        📷 {formatearHoraRelativa(estado.timestamp)} · {formatearHora(estado.timestamp)}
+                      </span>
+                      <span className="text-white-50 small d-none d-md-inline">
+                        {observacionesLegibles(conteo.observaciones)}
                       </span>
                     </div>
                   </div>
-                </CardBody>
+
+                  {/* barra de mando del monitor */}
+                  <div className="d-flex justify-content-between align-items-center px-3 py-2 border-top border-secondary">
+                    <span className="text-white-50 small">
+                      <RefreshCw size={12} className="me-1" />
+                      se refresca solo cada 30 s
+                    </span>
+                    <BotonCapturar capturando={capturando} onClick={solicitarCaptura} />
+                  </div>
+                </div>
               </Card>
             </Col>
 
-            <Col xs="12" lg="5" xl="4">
-              <Card
-                className={`border-${
-                  faltantes.length === 0 && !hayDesorden ? "success" : "danger"
-                }`}
-              >
-                <CardHeader
-                  className={`bg-${
-                    faltantes.length === 0 && !hayDesorden ? "success" : "danger"
-                  } text-white`}
-                >
-                  <H5 attrH5={{ className: "mb-0" }}>
-                    {faltantes.length === 0 && !hayDesorden
-                      ? "✅ Todo en orden"
-                      : `⚠️ ${faltantes.length} producto${
-                          faltantes.length === 1 ? "" : "s"
-                        } faltante${faltantes.length === 1 ? "" : "s"}`}
-                  </H5>
-                </CardHeader>
-                <CardBody>
-                  {hayDesorden && (
-                    <Alert color="warning" className="py-2 px-3 mb-3">
-                      🚨 Hay un producto fuera de su lugar
-                    </Alert>
-                  )}
-                  <P attrPara={{ className: "text-muted small" }}>
-                    {observacionesLegibles(conteo.observaciones)}
-                  </P>
-                  <div className="d-flex justify-content-between small mb-1">
-                    <span>Confianza general</span>
-                    <span>{Math.round(conteo.confianza_general * 100)}%</span>
+            {/* ============ EL VEREDICTO + KPIs ============ */}
+            <Col xs="12" lg="4" className="d-flex flex-column gap-3">
+              <Card className={`mb-0 b-l-${todoEnOrden ? "success" : "danger"} border-4`}>
+                <CardBody className="d-flex align-items-center gap-3 py-3">
+                  <div className={`font-${todoEnOrden ? "success" : "danger"}`}>
+                    {todoEnOrden ? <CheckCircle size={44} /> : <AlertTriangle size={44} />}
                   </div>
-                  <Progress
-                    value={conteo.confianza_general * 100}
-                    color="primary"
-                    className="mb-3"
-                    style={{ height: "8px" }}
-                  />
-                  <div className="d-flex justify-content-between small">
-                    <span>Total contado</span>
-                    <span className="fw-bold">{conteo.cantidad_total}</span>
+                  <div>
+                    <div className={`f-w-700 font-${todoEnOrden ? "success" : "danger"}`} style={{ fontSize: "2.2rem", lineHeight: 1 }}>
+                      {todoEnOrden ? "OK" : <CountUp end={faltantes.length} duration={1.5} />}
+                    </div>
+                    <span className="text-muted">
+                      {todoEnOrden
+                        ? "Todo en orden en tu stand"
+                        : `producto${faltantes.length === 1 ? "" : "s"} faltante${faltantes.length === 1 ? "" : "s"} ahora`}
+                    </span>
                   </div>
                 </CardBody>
               </Card>
 
-              <H6 attrH6={{ className: "mt-3 mb-2" }}>Productos detectados</H6>
-              <Row className="g-2">
-                {productosOrdenados.map((prod) => {
-                  const esFaltante = faltantes.includes(prod.nombre);
-                  const esDesorden = prod.nombre === "producto_no_ubicado";
-                  const titulo = esDesorden ? "Producto desubicado" : prod.nombre;
-                  return (
-                    <Col xs="6" key={prod.nombre}>
-                      <Card
-                        className={`h-100 border-${
-                          esFaltante || esDesorden ? "danger" : "success"
-                        }`}
-                      >
-                        <CardBody className="p-2">
-                          <div className="d-flex justify-content-between align-items-start">
-                            <span className="small fw-bold text-truncate">{titulo}</span>
-                            {esFaltante && (
-                              <Badge color="danger" pill className="small">
-                                Falta
-                              </Badge>
-                            )}
-                            {esDesorden && (
-                              <Badge color="warning" pill className="small">
-                                Desorden
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="mt-1">
-                            <span className="fs-5 fw-bold">
-                              {esFaltante ? (
-                                <span className="text-danger">{prod.cantidad}</span>
-                              ) : (
-                                prod.cantidad
-                              )}
-                            </span>
-                            <span className="text-muted small ms-1">und.</span>
-                          </div>
-                          {esFaltante && (
-                            <P attrPara={{ className: "text-danger small mb-0 mt-1" }}>
-                              {prod.cantidad === 0
-                                ? `¡Falta ${prod.nombre}!`
-                                : `${prod.nombre}: quedan ${prod.cantidad}, falta espacio`}
-                            </P>
-                          )}
-                          <div className="mt-2">
-                            <Progress
-                              value={prod.confianza * 100}
-                              color={prod.confianza >= 0.9 ? "success" : "info"}
-                              style={{ height: "4px" }}
-                            />
-                            <div className="text-muted smallest mt-1">
-                              confianza {Math.round(prod.confianza * 100)}%
+              {!todoEnOrden && faltantes.length > 0 && (
+                <Card className="mb-0">
+                  <CardBody className="py-3">
+                    <H6 attrH6={{ className: "mb-2 text-muted" }}>Qué falta</H6>
+                    <div className="d-flex flex-wrap gap-2">
+                      {faltantes.map((sku) => (
+                        <Badge key={sku} color="danger" className="px-2 py-1">
+                          {sku}
+                        </Badge>
+                      ))}
+                    </div>
+                  </CardBody>
+                </Card>
+              )}
+
+              {desubicados && (
+                <Card className="mb-0 b-l-warning border-4">
+                  <CardBody className="d-flex align-items-center gap-3 py-3">
+                    <ShieldOff size={28} className="font-warning" />
+                    <div>
+                      <H6 attrH6={{ className: "mb-0" }}>
+                        {desubicados.cantidad} producto{desubicados.cantidad === 1 ? "" : "s"} fuera de su lugar
+                      </H6>
+                      <span className="text-muted small">acomódalos y captura de nuevo</span>
+                    </div>
+                  </CardBody>
+                </Card>
+              )}
+
+              <div className="widget-joins card mb-0">
+                <Row className="g-0">
+                  <Col xs="6" className="pe-0">
+                    <div className="media border-after-xs p-3">
+                      <div className="align-self-center me-3 text-start">
+                        <Package size={18} className="text-muted" />
+                      </div>
+                      <div className="media-body">
+                        <H5 attrH5={{ className: "mb-0" }}>
+                          <CountUp end={conteo.cantidad_total} duration={1.5} />
+                        </H5>
+                        <span className="mb-1 text-muted small">unidades en el stand</span>
+                      </div>
+                    </div>
+                  </Col>
+                  <Col xs="6" className="ps-0">
+                    <div className="media p-3">
+                      <div className="media-body">
+                        <H5 attrH5={{ className: "mb-0" }}>
+                          <CountUp end={Math.round(conteo.confianza_general * 100)} duration={1.5} />%
+                        </H5>
+                        <span className="mb-1 text-muted small">confianza del conteo</span>
+                        <Progress
+                          value={conteo.confianza_general * 100}
+                          color={conteo.confianza_general >= 0.85 ? "success" : "warning"}
+                          style={{ height: "5px" }}
+                          className="mt-1"
+                        />
+                      </div>
+                    </div>
+                  </Col>
+                </Row>
+              </div>
+            </Col>
+
+            {/* ============ ESTADO POR PRODUCTO ============ */}
+            <Col xs="12">
+              <Card className="mb-0">
+                <CardBody className="pt-3">
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <H5 attrH5={{ className: "mb-0" }}>Estado por producto</H5>
+                    <span className="text-muted small">
+                      actualizado {formatearHoraRelativa(estado.timestamp)}
+                    </span>
+                  </div>
+                  {/* Patrón "media" del template: se apila limpio en móvil, 2 columnas en desktop */}
+                  <Row className="g-3">
+                    {productosOrdenados.map((prod) => {
+                      const esFaltante = faltantes.includes(prod.nombre);
+                      const esDesorden = prod.nombre === "producto_no_ubicado";
+                      const color = esFaltante ? "danger" : esDesorden ? "warning" : "success";
+                      return (
+                        <Col md="6" key={prod.nombre}>
+                          <div className={`media p-3 border rounded b-l-${color} border-3 align-items-center`}>
+                            <div className={`d-flex align-items-center justify-content-center rounded-circle bg-light-${color} font-${color} me-3`}
+                              style={{ width: 46, height: 46, flexShrink: 0 }}>
+                              {esFaltante ? <AlertTriangle size={22} /> : esDesorden ? <ShieldOff size={22} /> : <CheckCircle size={22} />}
+                            </div>
+                            <div className="media-body">
+                              <div className="d-flex justify-content-between align-items-start">
+                                <div>
+                                  <H6 attrH6={{ className: "mb-0" }}>
+                                    {esDesorden ? "Producto desubicado" : prod.nombre}
+                                  </H6>
+                                  <span className={`small ${esFaltante ? "font-danger" : "text-muted"}`}>
+                                    {esFaltante
+                                      ? prod.cantidad > 0
+                                        ? `quedan ${prod.cantidad}, falta espacio`
+                                        : "agotado en el stand"
+                                      : esDesorden
+                                        ? "fuera de su lugar"
+                                        : "completo"}
+                                  </span>
+                                </div>
+                                <div className="text-end">
+                                  <span className={`f-w-700 fs-4 ${esFaltante ? "font-danger" : ""}`}>
+                                    {prod.cantidad}
+                                  </span>
+                                  <span className="text-muted small ms-1">und.</span>
+                                </div>
+                              </div>
+                              <div className="d-flex align-items-center gap-2 mt-2">
+                                <Progress
+                                  value={prod.confianza * 100}
+                                  color={prod.confianza >= 0.9 ? "success" : "info"}
+                                  style={{ height: "5px" }}
+                                  className="flex-grow-1"
+                                />
+                                <span className="text-muted smallest">{Math.round(prod.confianza * 100)}%</span>
+                              </div>
                             </div>
                           </div>
-                        </CardBody>
-                      </Card>
-                    </Col>
-                  );
-                })}
-              </Row>
+                        </Col>
+                      );
+                    })}
+                  </Row>
+                </CardBody>
+              </Card>
             </Col>
           </Row>
         )}
