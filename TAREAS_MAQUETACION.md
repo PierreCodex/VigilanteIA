@@ -1,36 +1,57 @@
-# Tareas de maquetación — Panel VigilanteIA
+# Tareas del Panel VigilanteIA — FASE: CONEXIÓN REAL
 
-**Para:** agente de maquetación · **Fecha:** 2026-07-12 · **Repo:** este (template Viho, React 19 + Vite 7 + reactstrap)
+**Para:** agente del panel · **Fecha:** 2026-07-13 · **Repo:** este (template Viho, React 19 + Vite 7 + reactstrap)
 
-## Contexto (leer antes de tocar código)
+## 🚨 ESTADO ACTUAL — LEER PRIMERO (esto manda sobre todo lo de abajo)
+
+La fase de maquetación con datos DUMMY **YA TERMINÓ**. El panel **YA ESTÁ CONECTADO al
+backend real** (FastAPI). NO estás empezando de cero:
+
+- **Login REAL** (`src/Auth/Signin.jsx`): usa `iniciarSesion()` contra el backend + JWT.
+  El login fake (test@gmail.com) **fue eliminado**. NO lo restaures.
+- **Cliente API real**: `src/api/vigilanteApi.js` (axios + `VITE_API_URL` + Bearer JWT +
+  manejo de 401). Todas las vistas lo usan.
+- **Vistas YA conectadas y funcionando**: `Stand`, `Monitoreo`, `Productos`, `Historial`
+  consumen la API real (`getStandActual`, `getMonitoreo`, `getSlots/putSlots`,
+  `getEventos/getDiscrepancias`). NO tienen dummy.
+- **Roles**: el menú oculta items `soloAdmin` según el rol del JWT (`esAdmin()`).
+
+**Tu trabajo AHORA:** implementar **T7 (Tiendas)** y **T8 (Integración)** CONECTADAS al
+backend real (las funciones axios ya existen en `vigilanteApi.js`) — más el encargo de
+`LIMPIEZA_MENU.md`. **NO reviertas nada a dummy. NO toques el login. NO reintroduzcas
+archivos de datos falsos.** Las secciones "dummy" de T1–T6 abajo son HISTÓRICAS (ya
+hechas) — se dejan como referencia del contrato JSON, no como tarea a rehacer.
+
+## Contexto del producto
 
 VigilanteIA es un vigilante de inventario: una cámara fija fotografía un stand de
-minimarket cada 5 minutos, un backend (FastAPI, repo aparte) cuenta los productos por
-posición ("slot") y detecta faltantes. Este panel es **la cara para el dueño de la
-tienda** (usuario NO técnico): ver su stand, configurar qué producto va en cada posición
-y revisar el historial de eventos.
-
-**Este encargo es SOLO maquetación con datos dummy.** La conexión al backend real
-(axios + JWT + `VITE_API_URL`) la hace otro agente después — NO la implementes.
+minimarket cada 5 minutos, un backend cuenta los productos por posición ("slot"),
+detecta faltantes y — con el POS conectado — distingue una venta de una merma. Este
+panel es **la cara para el dueño de la tienda** (usuario NO técnico).
 
 ## Reglas generales
 
-1. **NO conectar ninguna API real.** Todos los datos salen de archivos dummy locales
-   (tarea T1). Las formas JSON de abajo son EXACTAS al contrato del backend — respétalas
-   para que conectar después sea solo cambiar la fuente de datos.
+1. **Conectar SIEMPRE al backend real** vía las funciones de `src/api/vigilanteApi.js`.
+   NO crear archivos de datos dummy nuevos. Si una función axios que necesitas no existe,
+   agrégala en `vigilanteApi.js` siguiendo el patrón de las que ya están.
 2. **NO borrar ni refactorizar los módulos demo del template** (ecommerce, chat, email…).
-   Solo AGREGAR páginas nuevas. La limpieza se hace al final del proyecto.
-3. **NO tocar el flujo de auth** (`src/Auth/Signin.jsx`, `PrivateRoute`): el login fake
-   (test@gmail.com / test123) se queda; solo se restiliza (T5).
-4. **UI en español** (el usuario es un bodeguero peruano). Textos simples, sin jerga
-   técnica: "falta Coca-Cola 500ml desde las 18:42", no "discrepancia SKU".
-5. Responsive: el dueño lo verá sobre todo desde el CELULAR.
-6. Componentes del template primero (reactstrap, DataTables, ApexCharts, sweetalert2);
-   librerías nuevas solo si es imprescindible.
+   Solo AGREGAR/editar lo de VigilanteIA. La limpieza del menú es su propio encargo
+   (`LIMPIEZA_MENU.md`).
+3. **NO tocar el login real** (`src/Auth/Signin.jsx`, `PrivateRoute`, `vigilanteApi.js`).
+   Ya funciona contra el backend.
+4. **UI en español** (bodeguero peruano). Textos simples, sin jerga técnica:
+   "falta Coca-Cola 500ml desde las 18:42", no "discrepancia SKU".
+5. Responsive: el dueño lo verá sobre todo desde el CELULAR (probar a 390px).
+6. **Reutilizar componentes del template** (ver ⭐ Regla de Oro más abajo): NO crear
+   estilos nuevos ni CSS propio.
 
-## Formas JSON (contrato congelado — no inventar campos)
+## Formas JSON (contrato REAL del backend — no inventar campos)
 
-**Estado actual del stand** (`GET /stand/actual` en el futuro):
+Estas son las respuestas REALES de los endpoints (ya en producción). Úsalas como
+referencia del shape; las vistas nuevas las obtienen con las funciones de
+`src/api/vigilanteApi.js`, no con archivos dummy.
+
+**Estado actual del stand** (`GET /stand/actual`):
 
 ```json
 {
@@ -102,13 +123,18 @@ el de arriba + eventos de discrepancia:
 }
 ```
 
-Nota: los eventos `tipo: "auditoria"` ya existen en la API real (con `origen`
-"esp32" o "manual" y su array `faltantes`); los `tipo: "discrepancia"` llegan en una
-etapa posterior — maquetarlos igual con dummy.
+Nota: los eventos `tipo: "auditoria"` vienen de `getEventos()`; las `discrepancia`
+(conciliación venta-vs-merma) de `getDiscrepancias()`. La vista Historial YA une ambos
+en una línea de tiempo con semáforo (Venta ✓ / Merma / Por conciliar). No es dummy.
 
 ## Tareas
 
-### T1 — Datos dummy + rutas + menú
+> **T1–T6 = HISTÓRICAS (ya implementadas y luego conectadas al backend real).** Se dejan
+> abajo SOLO como referencia del contrato y del comportamiento esperado de cada vista.
+> **NO las rehagas ni las reviertas a dummy.** Tus tareas activas son **T7, T8** y el
+> encargo de **`LIMPIEZA_MENU.md`**.
+
+### T1 — Datos dummy + rutas + menú ✅ (histórica; hoy las vistas usan la API real)
 - Crear `src/Data/Vigilante/` con los JSON dummy (formas de arriba): estado actual,
   ~30 eventos de historial variados (auditorías normales, 2-3 discrepancias, un
   `producto_no_ubicado`, y al menos 1 **faltante parcial**: SKU con cantidad > 0 que
@@ -196,15 +222,17 @@ criterio — úsala como ejemplo de estilo a seguir (monitor NVR, tarjetas `medi
 icono de estado + borde de color + progress, KPIs `widget-joins`). Las vistas nuevas
 deben verse coherentes con ella.
 
-### T7 — Vista admin "Tiendas" (`/admin/tiendas`) — NUEVA (2026-07-12)
+### ▶ T7 — Vista admin "Tiendas" (`/admin/tiendas`) — ACTIVA, CONECTAR A LA API REAL
 
 **Reutiliza componentes** (ver Regla de Oro): la tabla de tiendas con el patrón de
 `Widgets/General/EmployeeStatusCard.jsx` o `Tables/DataTable/`; el modal "Nueva tienda"
 con `UiKits/Modals/`; el formulario dentro del modal con el patrón de
 `Forms/FormLayout/Default/`.
 
-Solo para el administrador del sistema (no el dueño). La API real YA existe
-(`GET/POST /api/panel/v1/admin/tenants`, requiere rol admin). Maquetar con dummy:
+Solo para el administrador (item `soloAdmin` en el menú). **Conéctala a la API real** con
+`getTenants()` y `crearTenant()` de `src/api/vigilanteApi.js` (ya existen). Endpoints:
+`GET/POST /api/panel/v1/admin/tenants` (requieren rol admin — el backend responde 403 si
+no lo es). NADA de dummy. Forma real de cada fila:
 
 - **Tabla de tiendas**: nombre, slug, dueño (email), cámaras (MACs como badges),
   estado activo/inactivo. Forma real de cada fila:
@@ -226,7 +254,8 @@ Solo para el administrador del sistema (no el dueño). La API real YA existe
     `dueno_nombre` (opcional) — el login que usará el dueño.
   - `nodo_mac` (opcional) — MAC de la cámara ESP32 de la tienda, formato libre
     (`14:C1:9F:C1:B7:60` o `14c19fc1b760`; el backend la normaliza).
-  - Al enviar (dummy): agregar la fila a la tabla local + toast "Tienda creada".
+  - Al enviar: `crearTenant({nombre, dueno_email, dueno_password, dueno_nombre, nodo_mac})`
+    → toast "Tienda creada" + refrescar la tabla con `getTenants()`.
 - Errores a contemplar en la UI: email duplicado y MAC duplicada (la API responde
   409 con `detail` legible — mostrar en el modal).
 - Esta vista va en el menú DENTRO de la sección admin, junto a "Herramientas".
@@ -256,19 +285,20 @@ real YA existe y el cliente axios también (`getIntegracion`, `putIntegracion`,
 - Entrada de menú en la sección VigilanteIA (icono Link/Share2), visible para todos
   los roles.
 
-### T6 — Placeholder sección admin
-- Una entrada de menú "Herramientas (admin)" con una página placeholder ("Herramientas
-  de validación — próximamente"). Aquí vivirán después las herramientas de ingeniería;
-  por ahora solo reservar el lugar en el menú, separada visualmente de las vistas del
-  dueño.
+### T6 — Placeholder sección admin ✅ (histórica; ya existe la página placeholder)
+- Entrada de menú "Herramientas (admin)" con página placeholder. Ya hecha. Aquí vivirán
+  después las herramientas de ingeniería.
 
-## Definición de "terminado"
+## Definición de "terminado" (para T7 y T8)
 
 - `npm run dev` levanta sin errores ni warnings nuevos en consola.
-- Las 3 vistas navegables desde el sidebar, pobladas con los dummy, usables en móvil
-  (probar a 390px de ancho).
-- Las formas de los datos dummy coinciden EXACTO con los JSON de este documento.
-- Nada del template original roto (el resto de demos siguen abriendo).
+- T7 y T8 navegables desde el sidebar y **consumiendo la API real** (con el backend
+  corriendo en `VITE_API_URL`), usables en móvil (probar a 390px).
+- T7 usa `getTenants`/`crearTenant`; T8 usa `getIntegracion`/`putIntegracion`/
+  `probarIntegracion`. NADA de datos dummy.
+- Reutilizan componentes del template (declarar cuáles) — sin CSS nuevo.
+- Nada del template original ni de las vistas ya conectadas (Stand/Monitoreo/Productos/
+  Historial/Login) roto.
 
 ---
 
