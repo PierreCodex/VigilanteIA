@@ -191,6 +191,25 @@ Solo para el administrador del sistema (no el dueño). La API real YA existe
   409 con `detail` legible — mostrar en el modal).
 - Esta vista va en el menú DENTRO de la sección admin, junto a "Herramientas".
 
+### T8 — Vista "Integración" (`/integracion`) — NUEVA (2026-07-12)
+Conectar el sistema del cliente (POS) para la conciliación venta-vs-merma. La API
+real YA existe y el cliente axios también (`getIntegracion`, `putIntegracion`,
+`probarIntegracion` en `src/api/vigilanteApi.js`) — esta vista se conecta DIRECTO
+(ya no hay dummy en este repo):
+
+- **Formulario** (Card): select `tipo` (SistemaPos / API estándar / Sin sistema),
+  input `base_url` (ej. `https://mipos.com`), input `token` tipo password con nota
+  "déjalo vacío para conservar el guardado" (la API nunca devuelve el token; muestra
+  `token_configurado: true/false` como badge "Token guardado ✓").
+- **Botón "Probar conexión"**: llama `probarIntegracion()` → toast verde con
+  `latencia_ms` o rojo con el `mensaje` de error.
+- **Botón "Guardar"**: `putIntegracion({tipo, base_url, token, activo})`.
+- Texto explicativo para el dueño: "Conecta tu sistema de ventas para que
+  VigilanteIA distinga una venta normal de una pérdida. Solo lectura: nunca
+  modificamos nada en tu sistema."
+- Entrada de menú en la sección VigilanteIA (icono Link/Share2), visible para todos
+  los roles.
+
 ### T6 — Placeholder sección admin
 - Una entrada de menú "Herramientas (admin)" con una página placeholder ("Herramientas
   de validación — próximamente"). Aquí vivirán después las herramientas de ingeniería;
