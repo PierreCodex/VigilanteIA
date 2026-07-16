@@ -184,7 +184,9 @@ import VigilanteStand from "../Components/VigilanteIA/Stand";
 import VigilanteMonitoreo from "../Components/VigilanteIA/Monitoreo";
 import VigilanteProductos from "../Components/VigilanteIA/Productos";
 import VigilanteHistorial from "../Components/VigilanteIA/Historial";
+import VigilanteIntegracion from "../Components/VigilanteIA/Integracion";
 import VigilanteAdmin from "../Components/VigilanteIA/Admin";
+import VigilanteTiendas from "../Components/VigilanteIA/Tiendas";
 
 export const routes = [
   //dashboard
@@ -369,5 +371,7 @@ export const routes = [
   { path: `/monitoreo`, Component: <VigilanteMonitoreo /> },
   { path: `/productos`, Component: <VigilanteProductos /> },
   { path: `/historial`, Component: <VigilanteHistorial /> },
+  { path: `/integracion`, Component: <VigilanteIntegracion /> },
   { path: `/admin/herramientas`, Component: <VigilanteAdmin /> },
+  { path: `/admin/tiendas`, Component: <VigilanteTiendas /> },
 ];

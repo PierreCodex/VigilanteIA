@@ -13,15 +13,54 @@ import {
   Badge,
 } from "reactstrap";
 import { Breadcrumbs, H4, H5, H6, P } from "../../../AbstractElements";
-import { Save, Trash2, Plus } from "react-feather";
+import { Save, Trash2, Plus, Zap, CheckCircle, AlertTriangle, Info } from "react-feather";
 import { toast } from "react-toastify";
 import { Spinner } from "reactstrap";
 import {
+  detectarSlots,
   getSlots,
   getStandActual,
+  getUltimaCapturaBlob,
   mensajeDeError,
   putSlots,
+  validarSku,
 } from "../../../api/vigilanteApi";
+
+// Veredicto de una etiqueta contra el sistema de ventas. Tres estados, no dos: "no se pudo
+// verificar" (POS caído) NO es "el código está mal" — se pinta neutro, nunca en rojo.
+const VeredictoSku = ({ estado }) => {
+  if (!estado) return null;
+  if (estado.cargando)
+    return (
+      <small className="text-muted d-flex align-items-center mt-1">
+        <Spinner size="sm" className="me-1" /> Consultando tu sistema de ventas...
+      </small>
+    );
+  if (!estado.verificado)
+    return (
+      <small className="text-muted d-flex align-items-center mt-1">
+        <Info size={13} className="me-1 flex-shrink-0" /> {estado.mensaje}
+      </small>
+    );
+  if (!estado.existe)
+    return (
+      <small className="text-warning d-flex align-items-center mt-1">
+        <AlertTriangle size={13} className="me-1 flex-shrink-0" />
+        Tu sistema de ventas no tiene este código
+      </small>
+    );
+  return (
+    <small className="text-success d-flex align-items-center mt-1">
+      <CheckCircle size={13} className="me-1 flex-shrink-0" />
+      <span>
+        {estado.nombre}
+        {estado.stock !== null && estado.stock !== undefined && (
+          <span className="text-muted"> · stock en el POS: {estado.stock}</span>
+        )}
+      </span>
+    </small>
+  );
+};
 
 const normalizarRoi = (x, y, w, h, ancho, alto) => {
   const nx = Math.max(0, Math.min(1, x / ancho));
@@ -38,9 +77,15 @@ const Productos = () => {
   const [imagen, setImagen] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
+  const [detectando, setDetectando] = useState(false);
+  // Cache de veredictos por código: { [sku]: {cargando|verificado, existe, nombre, stock} }.
+  // Cachear por SKU (y no por slot) evita re-preguntarle al POS del cliente por un código
+  // que ya validamos, aunque el dueño salte entre recuadros.
+  const [validaciones, setValidaciones] = useState({});
   const contenedorRef = useRef(null);
 
   useEffect(() => {
+    let blobUrl = null; // objectURL a revocar al desmontar (si usamos el fallback)
     const cargar = async () => {
       try {
         const data = await getSlots();
@@ -49,15 +94,25 @@ const Productos = () => {
         toast.error(mensajeDeError(error));
       }
       try {
-        // La foto de fondo del editor es la última captura del stand.
+        // La foto de fondo del editor es la última auditoría del stand.
         const stand = await getStandActual();
         setImagen(stand.imagen_url);
       } catch {
-        setImagen(null); // sin capturas aún: el editor avisa
+        // Sin auditorías (modo instalación): caemos a la última captura cruda en disco,
+        // así se pueden dibujar los slots antes de confirmar el stand.
+        try {
+          blobUrl = await getUltimaCapturaBlob();
+          setImagen(blobUrl);
+        } catch {
+          setImagen(null); // sin capturas aún: el editor avisa
+        }
       }
       setCargando(false);
     };
     cargar();
+    return () => {
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+    };
   }, []);
 
   // Sugerencias para el autocompletado: las etiquetas ya usadas en otros slots.
@@ -114,10 +169,55 @@ const Productos = () => {
     setSlots(slots.map((s) => (s.id === id ? { ...s, sku } : s)));
   };
 
+  // Valida contra el POS al SALIR del input (onBlur), no en cada tecla: un lector de código
+  // de barras escupe ~13 caracteres de golpe y dispararía 13 requests al sistema del cliente.
+  const validar = async (sku) => {
+    const codigo = (sku || "").trim();
+    if (!codigo || validaciones[codigo]) return; // vacío o ya consultado
+    setValidaciones((prev) => ({ ...prev, [codigo]: { cargando: true } }));
+    try {
+      const data = await validarSku(codigo);
+      setValidaciones((prev) => ({ ...prev, [codigo]: { ...data, cargando: false } }));
+    } catch (error) {
+      // Ni siquiera llegamos al backend: es "no verificado", no "código inválido".
+      setValidaciones((prev) => ({
+        ...prev,
+        [codigo]: { cargando: false, verificado: false, mensaje: mensajeDeError(error) },
+      }));
+    }
+  };
+
   const borrarSlot = (id) => {
     setSlots(slots.filter((s) => s.id !== id));
     setSeleccionado(null);
     toast.info("Recuadro borrado");
+  };
+
+  const detectar = async () => {
+    if (
+      slots.length > 0 &&
+      !window.confirm(
+        "La detección automática reemplazará los recuadros actuales por los que proponga la IA. ¿Continuar?"
+      )
+    )
+      return;
+    setDetectando(true);
+    try {
+      const data = await detectarSlots();
+      const propuestos = data.slots || [];
+      if (propuestos.length === 0) {
+        toast.warn("La IA no encontró productos claros. Dibújalos a mano.");
+      } else {
+        // ids temporales para el editor; se renumeran 1..N al guardar.
+        setSlots(propuestos.map((s, i) => ({ id: Date.now() + i, sku: "", roi: s.roi })));
+        setSeleccionado(null);
+        toast.success(`${propuestos.length} recuadro(s) propuesto(s). Ponle el código a cada uno.`);
+      }
+    } catch (error) {
+      toast.error(mensajeDeError(error));
+    } finally {
+      setDetectando(false);
+    }
   };
 
   const guardar = async () => {
@@ -163,20 +263,40 @@ const Productos = () => {
           <Col xs="12">
             <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
               <H4 attrH4={{ className: "mb-0" }}>Configurar productos</H4>
-              <Button color="primary" disabled={guardando || cargando} onClick={guardar}>
-                {guardando ? (
-                  <>
-                    <Spinner size="sm" className="me-1" /> Guardando…
-                  </>
-                ) : (
-                  <>
-                    <Save size={16} className="me-1" /> Guardar cambios
-                  </>
-                )}
-              </Button>
+              <div className="d-flex gap-2">
+                <Button
+                  color="secondary"
+                  outline
+                  disabled={detectando || guardando || cargando || !imagen}
+                  onClick={detectar}
+                  title={imagen ? "" : "Necesitas una foto del stand primero"}
+                >
+                  {detectando ? (
+                    <>
+                      <Spinner size="sm" className="me-1" /> Detectando…
+                    </>
+                  ) : (
+                    <>
+                      <Zap size={16} className="me-1" /> Detectar automático
+                    </>
+                  )}
+                </Button>
+                <Button color="primary" disabled={guardando || cargando} onClick={guardar}>
+                  {guardando ? (
+                    <>
+                      <Spinner size="sm" className="me-1" /> Guardando…
+                    </>
+                  ) : (
+                    <>
+                      <Save size={16} className="me-1" /> Guardar cambios
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
             <P attrPara={{ className: "text-muted small" }}>
-              Dibuja un recuadro sobre cada producto que quieres vigilar.
+              Dibuja un recuadro sobre cada producto — o usa <strong>Detectar automático</strong>{" "}
+              para que la IA los proponga y tú solo pongas el código.
             </P>
           </Col>
 
@@ -296,13 +416,15 @@ const Productos = () => {
                           onChange={(e) =>
                             actualizarSku(slotActivo.id, e.target.value)
                           }
-                          placeholder="Ej: coca-500"
+                          onBlur={(e) => validar(e.target.value)}
+                          placeholder="Escanea el código de barras"
                         />
                         <datalist id="skus">
                           {skusDisponibles.map((s) => (
                             <option key={s} value={s} />
                           ))}
                         </datalist>
+                        <VeredictoSku estado={validaciones[slotActivo.sku.trim()]} />
                         <Button
                           color="danger"
                           size="sm"

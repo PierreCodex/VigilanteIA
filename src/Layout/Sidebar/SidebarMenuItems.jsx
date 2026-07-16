@@ -43,14 +43,17 @@ const SidebarMenuItems = ({ setMainMenu, sidebartoogle, setNavActive }) => {
           <div className="mobile-back text-end"><span>Back</span><i className="fa fa-angle-right ps-2"></i></div>
         </LI>
 
-        {MENUITEMS.map((Item, i) => (
+        {MENUITEMS.map((Item, i) => {
+          const visibleItems = Item.Items.filter((mi) => !mi.soloAdmin || esAdmin());
+          if (visibleItems.length === 0) return null;
+          return (
           < Fragment key={i} >
             <LI attrLI={{ className: 'sidebar-main-title' }} >
               <div>
                 <H6>{t(Item.menutitle)}</H6>
               </div>
             </LI>
-            {Item.Items.filter((mi) => !mi.soloAdmin || esAdmin()).map((menuItem, i) => (
+            {visibleItems.map((menuItem, i) => (
               <LI attrLI={{ className: 'dropdown' }} key={i}>
                 {menuItem.type === 'sub' && (
                   <a href="javascript"
@@ -158,8 +161,8 @@ const SidebarMenuItems = ({ setMainMenu, sidebartoogle, setNavActive }) => {
               </LI>
             ))}
           </Fragment>
-        ))
-        }
+          );
+        })}
       </UL>
     </Fragment>
   );

@@ -3,16 +3,12 @@ import { Card } from "reactstrap";
 import { Btn, LI } from "../../../AbstractElements";
 import { LogOut } from "react-feather";
 import { Link, useNavigate } from "react-router-dom";
+import { cerrarSesion } from "../../../api/vigilanteApi";
 
 const LogoutClass = () => {
   const history = useNavigate();
   const Logout = () => {
-    localStorage.removeItem("profileURL");
-    localStorage.removeItem("token");
-
-    localStorage.removeItem("auth0_profile");
-    localStorage.removeItem("Name");
-    localStorage.setItem("authenticated", false);
+    cerrarSesion();
     history(`/login`);
   };
 

@@ -29,8 +29,8 @@ const Routers = () => {
             <Route path={"/"} element={<PrivateRoute />}>
               {currentUser !== null || authenticated ? (
                 <>
-                  <Route exact path={``} element={<Navigate to={`/dashboard/default`} />} />
-                  <Route exact path={`/`} element={<Navigate to={`/dashboard/default`} />} />
+                  <Route exact path={``} element={<Navigate to={`/stand`} />} />
+                  <Route exact path={`/`} element={<Navigate to={`/stand`} />} />
                 </>
               ) : (
                 ""

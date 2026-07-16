@@ -20,13 +20,13 @@ const Leftbar = () => {
             <div className="main-header-left">
                 {mixLayout ?
                     <div className="logo-wrapper">
-                        <Link to={`/dashboard/default`}>
+                        <Link to={`/stand`}>
                             <Image attrImage={{ className: 'img-fluid d-inline', src: `${('/src/assets/images/logo/logo.png')}`, alt: '' }} />
                         </Link>
                     </div>
                     :
                     <div className="dark-logo-wrapper">
-                        <Link to={`/dashboard/default`}>
+                        <Link to={`/stand`}>
                             <Image attrImage={{ className: 'img-fluid d-inline', src: `${('/src/assets/images/logo/dark-logo.png')}`, alt: '' }} />
                         </Link>
                     </div>

@@ -64,11 +64,49 @@ export const capturarAhora = async () => (await api.post("/stand/capturar")).dat
 
 export const getMonitoreo = async () => (await api.get("/monitoreo")).data;
 
+// Estado de confirmación del stand + checklist de requisitos (sin probar el POS en vivo).
+export const getConfirmacionStand = async () =>
+  (await api.get("/stand/confirmacion")).data;
+
+// Confirma el stand (valida requisitos + prueba el POS en vivo). Si algún requisito falla,
+// responde 200 con { confirmado:false, requisitos:[...] } — no lanza; la vista muestra el checklist.
+export const confirmarStand = async () => (await api.post("/stand/confirmar")).data;
+
+// Vuelve al modo instalación (deja de contar) para reacomodar el estante.
+export const desconfirmarStand = async () => (await api.delete("/stand/confirmar")).data;
+
+// Cuenta la última foto bajo demanda y la registra en el Historial (botón "Analizar").
+// Timeout amplio: la IA puede pasar los 30s por defecto del cliente.
+export const analizarStand = async () =>
+  (await api.post("/stand/analizar", null, { timeout: 90000 })).data;
+
+// URL objeto (blob) de la última captura cruda en disco, para dibujar slots en instalación.
+// Va por axios (no <img src>) porque necesita el header Bearer. Recordá revocar el objectURL.
+export const getUltimaCapturaBlob = async () => {
+  const { data } = await api.get("/stand/ultima-captura", { responseType: "blob" });
+  return URL.createObjectURL(data);
+};
+
+// Cada cuánto vigila una cámara. minutos: 0 (apagado) | 5 | 15 | 30 | 60.
+export const setIntervalo = async (mac, minutos) =>
+  (await api.put(`/nodos/${encodeURIComponent(mac)}/intervalo`, { minutos })).data;
+
 // --- Slots (configurar productos) ---
 
 export const getSlots = async () => (await api.get("/slots")).data;
 
 export const putSlots = async (slots) => (await api.put("/slots", { slots })).data;
+
+// Auto-detección: la IA propone recuadros (sin etiqueta) sobre la última foto. No persiste;
+// el editor los carga para que el dueño solo escriba el código. Timeout amplio (la IA tarda).
+export const detectarSlots = async () =>
+  (await api.post("/slots/detectar", null, { timeout: 90000 })).data;
+
+// ¿El sistema de ventas conoce este código? Devuelve { verificado, existe, nombre, stock }.
+// Ojo con los TRES estados: verificado=false NO significa "código malo", significa "no
+// pudimos preguntar" (POS caído). Nunca lo pintes como error del dueño.
+export const validarSku = async (sku) =>
+  (await api.get("/slots/validar-sku", { params: { sku } })).data;
 
 // --- Historial ---
 

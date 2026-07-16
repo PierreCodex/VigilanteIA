@@ -4,12 +4,8 @@ import { useContext } from 'react';
 import { Maximize } from 'react-feather';
 import { LI, UL } from '../../../AbstractElements';
 import CustomizerContext from '../../../_helper/Customizer';
-import Bookmarks from './Bookmark';
-import LanguageClass from './Language';
 import LogoutClass from './Logout';
-import MessageDrop from './MessageDrop';
 import MoonLight from './MoonLight';
-import Notifications from './Notifiations';
 
 const Rightbar = () => {
     const { sidebarResponsive } = useContext(CustomizerContext);
@@ -42,11 +38,7 @@ const Rightbar = () => {
                     <LI><a className="text-dark" href="#javascript" onClick={goFull}>
                         <Maximize />
                     </a></LI>
-                    <LanguageClass />
-                    <Bookmarks />
-                    <Notifications />
                     <MoonLight />
-                    <MessageDrop />
                     <LogoutClass />
                 </UL>
             </div>
